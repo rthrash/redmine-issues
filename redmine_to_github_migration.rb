@@ -1,25 +1,34 @@
 require 'rubygems'
+require 'yaml'
 require 'rest-client'
 require 'json'
 require 'octopi'
 require 'ruby-debug'
 
 include Octopi
-username
-token =
+@config_file = "github.yml"
 
-authenticated_with :login => username, :token => token do
+authenticated :config => @config_file do
   puts "Authenticated!"
 
   class IssueMigrator
     attr_accessor :redmine_issues
     attr_accessor :issue_pairs
+
+    def initialize(config)
+        @redmine_url = config["redmine"]["url"]
+        @redmine_proj = config["redmine"]["project"]
+        @github_user = config["github"]["user"]
+        @github_repo = config["github"]["repo"]
+        @pad_ids = config["github"]["pad_ids"] || false
+    end
+
     def get_issues
       offset = 0
       issues = []
       puts "Getting redmine issues!"
       begin
-        json = RestClient.get("http://bugs.joindiaspora.com/issues", {:params => {:format => :json, :status_id => '*', :limit => 100, :offset => offset}})
+        json = RestClient.get("#{@redmine_url}/projects/#{@redmine_proj}/issues", {:params => {:format => :json, :status_id => '*', :limit => 100, :offset => offset}})
         result = JSON.parse(json)
         issues << [*result["issues"]]
         offset = offset + result['limit']
@@ -44,7 +53,7 @@ authenticated_with :login => username, :token => token do
     end
 
     def repo
-      @repo ||= Repository.find(:name => "redmine-issues", :user => "diaspora")
+      @repo ||= Repository.find(:name => @github_repo, :user => @github_user)
     end
 
     def migrate_issues
@@ -67,7 +76,7 @@ authenticated_with :login => username, :token => token do
     def create_issue redmine_issue
       params = { :title => redmine_issue["subject"]}
       params[:body] = <<BODY
-Issue #{redmine_issue["id"]} from bugs.joindiaspora.com
+Issue #{redmine_issue["id"]} from #{@redmine_url}/projects/#{@redmine_proj}
 Created by: **#{redmine_issue["author"]["name"]}**
 On #{DateTime.parse(redmine_issue["created_on"]).asctime}
 
@@ -142,7 +151,7 @@ COMMENT
 
     def get_comments redmine_issue
       print "."
-      issue_json = JSON.parse(RestClient.get("http://bugs.joindiaspora.com/issues/#{redmine_issue["id"]}", :params => {:format => :json, :include => :journals}))
+      issue_json = JSON.parse(RestClient.get("#{@redmine_url}/issues/#{redmine_issue["id"]}", :params => {:format => :json, :include => :journals}))
       issue_json["issue"]
     end
 
@@ -157,7 +166,7 @@ COMMENT
       full_saveable = []
       issue_pairs.each do |pair|
         full_saveable << {
-          :redmine => pair[1].merge(:url => "http://bugs.joindiaspora.com/issues/#{pair[1]["id"]}"),
+          :redmine => pair[1].merge(:url => "#{@redmine_url}/issues/#{pair[1]["id"]}"),
           :github => {
             :url => "#{pair[0].repository.url}/issues/#{pair[0].number}",
             :number => pair[0].number,
@@ -171,16 +180,12 @@ COMMENT
     end
   end
 
-  m = IssueMigrator.new
+  config = YAML.load_file(@config_file)
+  m = IssueMigrator.new(config)
   m.get_issues
 
   puts "Migrating issues to github..."
   m.migrate_issues
   m.save_issues "migration.json"
   puts "Done migrating!"
-
-  ## OPEN
-  # http://github.com/api/v2/json/issues/list/diaspora/diaspora/open
-  ## CLOSED
-  # http://github.com/api/v2/json/issues/list/diaspora/diaspora/closed
 end
