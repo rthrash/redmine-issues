@@ -67,7 +67,7 @@ authenticated :config => @config_file do
       github_issue = create_issue(issue)
       add_labels(github_issue, issue)
       migrate_comments(github_issue, issue)
-      github_issue.close! if ["Fixed", "Rejected", "Won't Fix", "Duplicate", "Obsolete", "Implemented"].include? issue["status"]["name"]
+      github_issue.close! if ["Closed", "Fixed", "Rejected", "Won't Fix", "Duplicate", "Obsolete", "Implemented"].include? issue["status"]["name"]
       print "."
       self.issue_pairs << [github_issue, issue]
       github_issue
