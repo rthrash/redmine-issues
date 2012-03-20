@@ -180,9 +180,10 @@ COMMENT
         print '.'
       end
     end
+
     def save_issues filename
       full_saveable = []
-      issue_pairs.each do |pair|
+      self.issue_pairs.each do |pair|
         full_saveable << {
           :redmine => pair[1].merge(:url => "#{@redmine_url}/issues/#{pair[1]["id"]}"),
           :github => {
