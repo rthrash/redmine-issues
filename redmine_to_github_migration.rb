@@ -75,20 +75,28 @@ authenticated :config => @config_file do
     end
 
     def pad_issues redmine_issue
-        last_issue = self.issue_pairs.empty? ? 0 : self.issue_pairs[-1][0].number
-        if (last_issue + 1) < redmine_issue["id"].to_i
-            params = { :title => "dummy issue", :body => "Dummy issue to pad out numeric IDs. Please disregard." }
-            begin
-                github_issue = Issue.open(:repo => self.repo, :params => params)
-                add_label_to_issue(github_issue, "dummy")
-                github_issue.close!
-                print "!"
-            rescue Exception => e
-                redmine_issue["retrying?"] = true
-                retry unless redmine_issue["retrying?"]
-                puts "Dummy issue open failed for Redmine Issue #{redmine_issue["id"]}"
-            end while (github_issue.number + 1) < redmine_issue["id"].to_i
+      last_issue = self.issue_pairs.empty? ? 0 : self.issue_pairs[-1][0].number
+      while (last_issue + 1) < redmine_issue["id"].to_i
+        last_issue = pad_issue
+      end
+   end
+
+    def pad_issue
+      first_try = true
+      params = { :title => "dummy issue", :body => "Dummy issue to pad out numeric IDs. Please disregard." }
+      begin
+        github_issue = Issue.open(:repo => self.repo, :params => params)
+        add_label_to_issue(github_issue, "dummy")
+        github_issue.close!
+        print "'"
+      rescue Exception => e
+        if first_try
+          first_try = false
+          retry
         end
+        puts "Dummy issue open failed"
+      end
+      github_issue.number
     end
 
     def create_issue redmine_issue
