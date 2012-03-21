@@ -93,7 +93,7 @@ authenticated :config => @config_file do
             end
           ],
           "assignee" => {
-            "login" => lookup_user(redmine_issue["assigned_to"]["name"]),
+            "login" => begin lookup_user(redmine_issue["assigned_to"]["name"]) rescue @github_user end,
           },
           "milestone" => { },
           "comments" => 0,
