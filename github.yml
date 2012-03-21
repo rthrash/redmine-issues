@@ -6,3 +6,5 @@ github:
 redmine:
     url: http://redmine.example.com
     project: source
+usermap:
+    "Foo Bar": foobar

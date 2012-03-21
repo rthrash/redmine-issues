@@ -21,6 +21,7 @@ authenticated :config => @config_file do
         @github_user = config["github"]["user"]
         @github_repo = config["github"]["repo"]
         @pad_ids = config["github"]["pad_ids"] || false
+        @usermap = config["usermap"] || {}
 
         @closed_statuses = %w{Closed Fixed Rejected Won't Fix Duplicate Obsolete Implemented}
     end
@@ -71,6 +72,10 @@ authenticated :config => @config_file do
       print "."
     end
 
+    def lookup_user user
+        @usermap[user] || @github_user
+    end
+
     def save_issue redmine_issue
         hash = {
           "url" => "https://api.github.com/repos/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
@@ -80,7 +85,7 @@ authenticated :config => @config_file do
           "title" => redmine_issue["subject"],
           "body" => redmine_issue['description'],
           "user" => {
-            "login" => @github_user,
+            "login" => lookup_user(redmine_issue["author"]["name"]),
           },
           "labels" => [
             collect_labels(redmine_issue).each do |label|
@@ -88,7 +93,7 @@ authenticated :config => @config_file do
             end
           ],
           "assignee" => {
-            "login" => @github_user,
+            "login" => lookup_user(redmine_issue["assigned_to"]["name"]),
           },
           "milestone" => { },
           "comments" => 0,
@@ -134,7 +139,7 @@ authenticated :config => @config_file do
           "url" => "https://api.github.com/repos/#{@github_user}/#{@github_repo}/issues/comments/#{redmine_issue['id']}",
           "body" => j["notes"],
           "user" => {
-            "login" => @github_user,
+            "login" => lookup_user(j["user"]["name"]),
           },
           "created_at" => Time.parse(j["created_on"]).utc.iso8601,
           "updated_at" => Time.parse(j["created_on"]).utc.iso8601,
