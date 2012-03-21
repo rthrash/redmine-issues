@@ -21,6 +21,8 @@ authenticated :config => @config_file do
         @github_user = config["github"]["user"]
         @github_repo = config["github"]["repo"]
         @pad_ids = config["github"]["pad_ids"] || false
+
+        @closed_statuses = %w{Closed Fixed Rejected Won't Fix Duplicate Obsolete Implemented}
     end
 
     def get_issues
@@ -64,129 +66,90 @@ authenticated :config => @config_file do
     end
 
     def migrate_issue issue
-      pad_issues(issue) if @pad_ids
-      github_issue = create_issue(issue)
-      add_labels(github_issue, issue)
-      migrate_comments(github_issue, issue)
-      github_issue.close! if ["Closed", "Fixed", "Rejected", "Won't Fix", "Duplicate", "Obsolete", "Implemented"].include? issue["status"]["name"]
+      save_issue(issue)
+      save_comments(issue)
       print "."
-      self.issue_pairs << [github_issue, issue]
-      github_issue
     end
 
-    def pad_issues redmine_issue
-      last_issue = self.issue_pairs.empty? ? 0 : self.issue_pairs[-1][0].number
-      while (last_issue + 1) < redmine_issue["id"].to_i
-        last_issue = pad_issue
-      end
-   end
+    def save_issue redmine_issue
+        hash = {
+          "url" => "https://api.github.com/repos/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
+          "html_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
+          "number" => redmine_issue["id"],
+          "state" => @closed_statuses.include?(redmine_issue["status"]["name"]) ? "closed" : "open",
+          "title" => redmine_issue["subject"],
+          "body" => redmine_issue['description'],
+          "user" => {
+            "login" => @github_user,
+          },
+          "labels" => [
+            collect_labels(redmine_issue).each do |label|
+              { "name" => label, }
+            end
+          ],
+          "assignee" => {
+            "login" => @github_user,
+          },
+          "milestone" => { },
+          "comments" => 0,
+          "pull_request" => {
+            "html_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
+            "diff_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}.diff",
+            "patch_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}.patch"
+          },
+          "closed_at" => @closed_statuses.include?(redmine_issue["status"]["name"]) ? Time.parse(redmine_issue["updated_on"]).utc.iso8601 : nil,
+          "created_at" => Time.parse(redmine_issue["created_on"]).utc.iso8601,
+          "updated_at" => Time.parse(redmine_issue["updated_on"]).utc.iso8601,
+        }
 
-    def pad_issue
-      first_try = true
-      params = { :title => "dummy issue", :body => "Dummy issue to pad out numeric IDs. Please disregard." }
-      begin
-        github_issue = Issue.open(:repo => self.repo, :params => params)
-        add_label_to_issue(github_issue, "dummy")
-        github_issue.close!
-        print "'"
-      rescue Exception => e
-        if first_try
-          first_try = false
-          retry
+        File.open("issues/#{'%03d' % redmine_issue['id']}.json", 'w') do |f|
+          #f.write(hash.to_json)
+          f.write(JSON.pretty_generate(hash))
         end
-        puts "Dummy issue open failed"
       end
-      github_issue.number
-    end
 
-    def create_issue redmine_issue
-      params = { :title => redmine_issue["subject"]}
-      params[:body] = <<BODY
-Issue #{redmine_issue["id"]} from #{@redmine_url}/projects/#{@redmine_proj}
-Created by: **#{redmine_issue["author"]["name"]}**
-On #{DateTime.parse(redmine_issue["created_on"]).asctime}
-
-*Priority: #{redmine_issue["priority"]["name"]}*
-*Status: #{redmine_issue["status"]["name"]}*
-#{
-  custom_fields = ''
-  redmine_issue["custom_fields"].each do |field|
-    custom_fields << "*#{field["name"]}: #{field["value"]}*\n" unless field["value"].nil? || field["value"] == ''
-  end if redmine_issue["custom_fields"]
-  custom_fields
-}
-
-#{redmine_issue["description"]}
-BODY
-      begin
-        Issue.open(:repo => self.repo, :params => params)
-      rescue Exception => e
-        redmine_issue["retrying?"] = true
-        retry unless redmine_issue["retrying?"]
-        puts "Issue open failed for Redmine Issue #{redmine_issue["id"]}"
-      end
-    end
-
-    def add_labels github_issue, redmine_issue
+    def collect_labels redmine_issue
       labels = []
       if priority = redmine_issue["priority"]
         if priority  == "Low"
-          add_label_to_issue(github_issue, "Low Priority")
+          labels << "Low Priority"
         elsif ["High", "Urgent", "Immediate"].include?(priority)
-          add_label_to_issue(github_issue, "High Priority")
+          labels << "High Priority"
         end
       end
       ["tracker", "status", "category"].each do |thing|
         next unless redmine_issue[thing]
         value = redmine_issue[thing]["name"]
         first_try = true
-        add_label_to_issue(github_issue, value) unless ["New", "Fixed"].include?(value)
+        labels << value unless ["New", "Fixed"].include?(value)
       end
+      labels
     end
 
-    def add_label_to_issue github_issue, label
-      label = "Will Not Fix" if label == "Won't Fix"
-      first_try = true
-      begin
-        github_issue.add_label URI.escape(label)
-        print ','
-      rescue Exception => e
-        puts
-        pp e
-        puts
-        puts label
-        puts URI.escape(label)
-        if first_try
-          first_try = false
-          retry
-        end
-      end
-    end
-
-    def migrate_comments github_issue, redmine_issue
+    def save_comments redmine_issue
+      hash = []
       redmine_issue["journals"].each do |j|
         next if j["notes"].nil? || j["notes"] == ''
-        github_issue.comment <<COMMENT
-Comment by: **#{j["user"]["name"]}**
-On #{DateTime.parse(j["created_on"]).asctime}
-
-#{j["notes"]}
-COMMENT
+        hash << {
+          "url" => "https://api.github.com/repos/#{@github_user}/#{@github_repo}/issues/comments/#{redmine_issue['id']}",
+          "body" => j["notes"],
+          "user" => {
+            "login" => @github_user,
+          },
+          "created_at" => Time.parse(j["created_on"]).utc.iso8601,
+          "updated_at" => Time.parse(j["created_on"]).utc.iso8601,
+        }
       end
+      File.open("issues/#{'%03d' % redmine_issue['id']}.comments.json", 'w') do |f|
+        #f.write(hash.to_json)
+        f.write(JSON.pretty_generate(hash))
+      end unless hash.empty?
     end
 
     def get_comments redmine_issue
       print "."
       issue_json = JSON.parse(RestClient.get("#{@redmine_url}/issues/#{redmine_issue["id"]}", :params => {:format => :json, :include => :journals}))
       issue_json["issue"]
-    end
-
-    def clear_issues
-      puts "Clearing issues!"
-      issues.each do |i|
-        i.close!
-        print '.'
-      end
     end
 
     def save_issues filename
@@ -202,7 +165,8 @@ COMMENT
         }
       end
       File.open(filename, 'w') do |f|
-        f.write(full_saveable.to_json)
+        #f.write(hash.to_json)
+        f.write(JSON.pretty_generate(hash))
       end
     end
   end
@@ -213,6 +177,5 @@ COMMENT
 
   puts "Migrating issues to github..."
   m.migrate_issues
-  m.save_issues "migration.json"
   puts "Done migrating!"
 end
