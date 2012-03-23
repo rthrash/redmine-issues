@@ -20,7 +20,6 @@ authenticated :config => @config_file do
         @redmine_proj = config["redmine"]["project"]
         @github_user = config["github"]["user"]
         @github_repo = config["github"]["repo"]
-        @pad_ids = config["github"]["pad_ids"] || false
         @usermap = config["usermap"] || {}
 
         @closed_statuses = %w{Closed Fixed Rejected Won't Fix Duplicate Obsolete Implemented}
@@ -31,7 +30,14 @@ authenticated :config => @config_file do
       issues = []
       puts "Getting redmine issues!"
       begin
-        json = RestClient.get("#{@redmine_url}/projects/#{@redmine_proj}/issues", {:params => {:format => :json, :status_id => '*', :limit => 100, :offset => offset}})
+        json = RestClient.get("#{@redmine_url}/projects/#{@redmine_proj}/issues",
+          {:params => {
+            :format => :json,
+            :status_id => '*',
+            :limit => 100,
+            :offset => offset
+          }
+        })
         result = JSON.parse(json)
         issues << [*result["issues"]]
         offset = offset + result['limit']
@@ -51,16 +57,7 @@ authenticated :config => @config_file do
       self.redmine_issues = issues.reverse!
     end
 
-    def issues
-      repo.issues
-    end
-
-    def repo
-      @repo ||= Repository.find(:name => @github_repo, :user => @github_user)
-    end
-
     def migrate_issues
-      self.issue_pairs = []
       redmine_issues.each do |issue|
         migrate_issue issue
       end
@@ -73,7 +70,7 @@ authenticated :config => @config_file do
     end
 
     def lookup_user user
-        @usermap[user] || @github_user
+      @usermap[user] || @github_user
     end
 
     def format_body text
@@ -86,56 +83,60 @@ authenticated :config => @config_file do
     end
 
     def save_issue redmine_issue
-        hash = {
-          "url" => "https://api.github.com/repos/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
+      hash = {
+        "url" => "https://api.github.com/repos/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
+        "html_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
+        "number" => redmine_issue["id"],
+        "state" => @closed_statuses.include?(redmine_issue["status"]["name"]) ? "closed" : "open",
+        "title" => redmine_issue["subject"],
+        "body" => self.format_body(redmine_issue['description']),
+        "user" => {
+          "login" => self.lookup_user(redmine_issue["author"]["name"]),
+        },
+        "labels" => {
+          collect_labels(redmine_issue).each do |label|
+            { "name" => label, }
+          end
+        },
+        "assignee" => {
+          "login" => begin
+                       self.lookup_user(redmine_issue["assigned_to"]["name"])
+                     rescue
+                       @github_user
+                     end,
+        },
+        "milestone" => { },
+        "comments" => 0,
+        "pull_request" => {
           "html_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
-          "number" => redmine_issue["id"],
-          "state" => @closed_statuses.include?(redmine_issue["status"]["name"]) ? "closed" : "open",
-          "title" => redmine_issue["subject"],
-          "body" => self.format_body(redmine_issue['description']),
-          "user" => {
-            "login" => self.lookup_user(redmine_issue["author"]["name"]),
-          },
-          "labels" => [
-            collect_labels(redmine_issue).each do |label|
-              { "name" => label, }
-            end
-          ],
-          "assignee" => {
-            "login" => begin self.lookup_user(redmine_issue["assigned_to"]["name"]) rescue @github_user end,
-          },
-          "milestone" => { },
-          "comments" => 0,
-          "pull_request" => {
-            "html_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
-            "diff_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}.diff",
-            "patch_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}.patch"
-          },
-          "closed_at" => @closed_statuses.include?(redmine_issue["status"]["name"]) ? Time.parse(redmine_issue["updated_on"]).utc.iso8601 : nil,
-          "created_at" => Time.parse(redmine_issue["created_on"]).utc.iso8601,
-          "updated_at" => Time.parse(redmine_issue["updated_on"]).utc.iso8601,
-        }
+          "diff_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}.diff",
+          "patch_url" => "https://github.com/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}.patch"
+        },
+        "closed_at" => @closed_statuses.include?(redmine_issue["status"]["name"]) ? Time.parse(redmine_issue["updated_on"]).utc.iso8601 : nil,
+        "created_at" => Time.parse(redmine_issue["created_on"]).utc.iso8601,
+        "updated_at" => Time.parse(redmine_issue["updated_on"]).utc.iso8601,
+      }
 
-        File.open("issues/#{'%03d' % redmine_issue['id']}.json", 'w') do |f|
-          #f.write(hash.to_json)
-          f.write(JSON.pretty_generate(hash))
-        end
+      File.open("issues/#{'%03d' % redmine_issue['id']}.json", 'w') do |f|
+        #f.write(hash.to_json)
+        f.write(JSON.pretty_generate(hash))
       end
+    end
 
     def collect_labels redmine_issue
       labels = []
       if priority = redmine_issue["priority"]
         if priority  == "Low"
           labels << "Low Priority"
-        elsif ["High", "Urgent", "Immediate"].include?(priority)
+        elsif %w{High Urgent Immediate}.include?(priority)
           labels << "High Priority"
         end
       end
-      ["tracker", "status", "category"].each do |thing|
+      %w{tracker status category}.each do |thing|
         next unless redmine_issue[thing]
         value = redmine_issue[thing]["name"]
         first_try = true
-        labels << value unless ["New", "Fixed"].include?(value)
+        labels << value unless %w{New Fixed}.include?(value)
       end
       labels
     end
@@ -162,28 +163,14 @@ authenticated :config => @config_file do
 
     def get_comments redmine_issue
       print "."
-      issue_json = JSON.parse(RestClient.get("#{@redmine_url}/issues/#{redmine_issue["id"]}", :params => {:format => :json, :include => :journals}))
+      issue_json = JSON.parse(RestClient.get("#{@redmine_url}/issues/#{redmine_issue["id"]}",
+        :params => {
+          :format => :json,
+          :include => :journals
+        }
+      ))
       issue_json["issue"]
     end
-
-    def save_issues filename
-      full_saveable = []
-      self.issue_pairs.each do |pair|
-        full_saveable << {
-          :redmine => pair[1].merge(:url => "#{@redmine_url}/issues/#{pair[1]["id"]}"),
-          :github => {
-            :url => "#{pair[0].repository.url}/issues/#{pair[0].number}",
-            :number => pair[0].number,
-            :repo_url => pair[0].repository.url
-          }
-        }
-      end
-      File.open(filename, 'w') do |f|
-        #f.write(hash.to_json)
-        f.write(JSON.pretty_generate(hash))
-      end
-    end
-  end
 
   config = YAML.load_file(@config_file)
   m = IssueMigrator.new(config)
