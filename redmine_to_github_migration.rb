@@ -76,6 +76,15 @@ authenticated :config => @config_file do
         @usermap[user] || @github_user
     end
 
+    def format_body text
+      # Use backticks for inline code blocks.
+      text.gsub!(/@(\S+)@/, "`\\1`")
+      # Remove all leading and trailing characters from commit references.
+      text.gsub!(/commit:"?(\w{40})"?\.?/, "commit: \\1")
+
+      text
+    end
+
     def save_issue redmine_issue
         hash = {
           "url" => "https://api.github.com/repos/#{@github_user}/#{@github_repo}/issues/#{redmine_issue['id']}",
@@ -83,7 +92,7 @@ authenticated :config => @config_file do
           "number" => redmine_issue["id"],
           "state" => @closed_statuses.include?(redmine_issue["status"]["name"]) ? "closed" : "open",
           "title" => redmine_issue["subject"],
-          "body" => redmine_issue['description'],
+          "body" => self.format_body(redmine_issue['description']),
           "user" => {
             "login" => lookup_user(redmine_issue["author"]["name"]),
           },
@@ -137,7 +146,7 @@ authenticated :config => @config_file do
         next if j["notes"].nil? || j["notes"] == ''
         hash << {
           "url" => "https://api.github.com/repos/#{@github_user}/#{@github_repo}/issues/comments/#{redmine_issue['id']}",
-          "body" => j["notes"],
+          "body" => self.format_body(j["notes"]),
           "user" => {
             "login" => lookup_user(j["user"]["name"]),
           },
