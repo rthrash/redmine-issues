@@ -94,7 +94,7 @@ authenticated :config => @config_file do
           "title" => redmine_issue["subject"],
           "body" => self.format_body(redmine_issue['description']),
           "user" => {
-            "login" => lookup_user(redmine_issue["author"]["name"]),
+            "login" => self.lookup_user(redmine_issue["author"]["name"]),
           },
           "labels" => [
             collect_labels(redmine_issue).each do |label|
@@ -102,7 +102,7 @@ authenticated :config => @config_file do
             end
           ],
           "assignee" => {
-            "login" => begin lookup_user(redmine_issue["assigned_to"]["name"]) rescue @github_user end,
+            "login" => begin self.lookup_user(redmine_issue["assigned_to"]["name"]) rescue @github_user end,
           },
           "milestone" => { },
           "comments" => 0,
@@ -148,7 +148,7 @@ authenticated :config => @config_file do
           "url" => "https://api.github.com/repos/#{@github_user}/#{@github_repo}/issues/comments/#{redmine_issue['id']}",
           "body" => self.format_body(j["notes"]),
           "user" => {
-            "login" => lookup_user(j["user"]["name"]),
+            "login" => self.lookup_user(j["user"]["name"]),
           },
           "created_at" => Time.parse(j["created_on"]).utc.iso8601,
           "updated_at" => Time.parse(j["created_on"]).utc.iso8601,
