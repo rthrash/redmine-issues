@@ -171,6 +171,7 @@ authenticated :config => @config_file do
       ))
       issue_json["issue"]
     end
+  end
 
   config = YAML.load_file(@config_file)
   m = IssueMigrator.new(config)
