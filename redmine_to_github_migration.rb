@@ -93,11 +93,7 @@ authenticated :config => @config_file do
         "user" => {
           "login" => self.lookup_user(redmine_issue["author"]["name"]),
         },
-        "labels" => {
-          collect_labels(redmine_issue).each do |label|
-            { "name" => label, }
-          end
-        },
+        "labels" => collect_labels(redmine_issue).map {|label| {"name" => label}},
         "assignee" => {
           "login" => begin
                        self.lookup_user(redmine_issue["assigned_to"]["name"])
