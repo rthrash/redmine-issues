@@ -75,7 +75,7 @@ authenticated :config => @config_file do
 
     def format_body text
       # Use backticks for inline code blocks.
-      text.gsub!(/@(\S+)@/, "`\\1`")
+      text.gsub!(/@([\S ]+?)@/, "`\\1`")
       # Remove all leading and trailing characters from commit references.
       text.gsub!(/commit:"?(\w{40})"?\.?/, "commit: \\1")
 
