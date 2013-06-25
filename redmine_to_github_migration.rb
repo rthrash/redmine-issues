@@ -1,3 +1,8 @@
+#TODO: Must figure out how to get more than what appears to be a limit of 100 issues … not sure though
+#TODO: *** Have it create a comment linking to the new repo on Github? ***
+#TODO: Finally, which custom fields we want to limit it to… Environment and affects versions make sense
+#TODO: Can we create a list of source/target repos to migrate and have it walk through them, too?
+
 require 'rubygems'
 require 'yaml'
 require 'rest-client'
@@ -102,7 +107,7 @@ authenticated :config => @config_file do
     def create_issue redmine_issue
       params = { :title => redmine_issue["subject"]}
       params[:body] = <<BODY
-Issue #{redmine_issue["id"]} from #{@redmine_url}/projects/#{@redmine_proj}
+Issue #<a href="{@redmine_url}/issues/{redmine_issue["id"]}">{redmine_issue["id"]}</a> from #{@redmine_url}/projects/#{@redmine_proj}
 Created by: **#{redmine_issue["author"]["name"]}**
 On #{DateTime.parse(redmine_issue["created_on"]).asctime}
 
