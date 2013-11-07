@@ -25,5 +25,5 @@ Forked from [Diaspora](https://joindiaspora.com/) / @diaspora
 
 ## Usage
 
-1. Configure `github.yml` with your details.
+1. Rename `github-example.yml` to `github.yml` and update with your details.
 1. Run `redmine_to_github_migration.rb`
