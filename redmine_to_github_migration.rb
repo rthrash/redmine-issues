@@ -7,10 +7,10 @@ require 'rubygems'
 require 'yaml'
 require 'rest-client'
 require 'json'
-require 'octopi'
-require 'ruby-debug'
+require 'octokit'
+require 'byebug'
 
-include Octopi
+include Octokit
 @config_file = "github.yml"
 
 authenticated :config => @config_file do

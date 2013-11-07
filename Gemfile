@@ -1,6 +1,8 @@
-source :rubygems
+source 'https://rubygems.org'
 
 gem "json"
-gem "octopi"
+#gem "octopi"
+gem "octokit"
 gem "rest-client"
-gem "ruby-debug"
+gem "byebug"
+gem 'mime-types', '~> 1.17'	
