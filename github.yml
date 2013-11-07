@@ -1,8 +1,0 @@
-github:
-    user: GITHUB_USER
-    token: GITHUB_TOKEN
-    repo: target
-    pad_ids: true
-redmine:
-    url: http://redmine.example.com
-    project: source
