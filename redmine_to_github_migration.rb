@@ -7,14 +7,19 @@ require 'rubygems'
 require 'yaml'
 require 'rest-client'
 require 'json'
-require 'octopi'
+require 'octokit'
 require 'ruby-debug'
 
-include Octopi
+include Octokit
 @config_file = "github.yml"
 
-authenticated :config => @config_file do
-  puts "Authenticated!"
+config = YAML.load_file(@config_file)
+ghclient = Octokit::Client.new :access_token => config["github"]["token"]
+if not ghclient.user.login 
+  abort "Unable to authenticate with supplied credentials."
+else
+  puts "Github credentials passed!"
+
 
   class IssueMigrator
     attr_accessor :redmine_issues
@@ -58,7 +63,7 @@ authenticated :config => @config_file do
     end
 
     def repo
-      @repo ||= Repository.find(:name => @github_repo, :user => @github_user)
+      @repo ||= Octokit::Repository.new(:repo => config["github"]["repo"], :owner => ghclient.user.login)
     end
 
     def migrate_issues
@@ -105,8 +110,8 @@ authenticated :config => @config_file do
     end
 
     def create_issue redmine_issue
-      params = { :title => redmine_issue["subject"]}
-      params[:body] = <<BODY
+      title = redmine_issue["subject"]
+      body = <<BODY
 Issue #<a href="{@redmine_url}/issues/{redmine_issue["id"]}">{redmine_issue["id"]}</a> from #{@redmine_url}/projects/#{@redmine_proj}
 Created by: **#{redmine_issue["author"]["name"]}**
 On #{DateTime.parse(redmine_issue["created_on"]).asctime}
@@ -124,7 +129,7 @@ On #{DateTime.parse(redmine_issue["created_on"]).asctime}
 #{redmine_issue["description"]}
 BODY
       begin
-        Issue.open(:repo => self.repo, :params => params)
+        Octokit.create_issue(:repo => self.repo, :params => title, :body => body)
       rescue Exception => e
         redmine_issue["retrying?"] = true
         retry unless redmine_issue["retrying?"]
@@ -212,7 +217,9 @@ COMMENT
     end
   end
 
-  config = YAML.load_file(@config_file)
+  Octokit.configure do |c|
+    c.access_token = config["github"]["token"]
+  end
   m = IssueMigrator.new(config)
   m.get_issues
 
