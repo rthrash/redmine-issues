@@ -2,7 +2,7 @@ github:
     user: GITHUB_USER
     token: GITHUB_TOKEN
     repo: target
-    pad_ids: true
+    pad_ids: false
 redmine:
     url: http://redmine.example.com
     project: source
