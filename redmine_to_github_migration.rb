@@ -129,7 +129,7 @@ On #{DateTime.parse(redmine_issue["created_on"]).asctime}
 #{redmine_issue["description"]}
 BODY
       begin
-        Octokit.create_issue(:repo => self.repo, :params => title, :body => body)
+        Octokit.create_issue(self.repo, title, body)
       rescue Exception => e
         redmine_issue["retrying?"] = true
         retry unless redmine_issue["retrying?"]

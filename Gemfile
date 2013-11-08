@@ -1,6 +1,6 @@
-source 'https://rubygems.org'
+source :rubygems
 
 gem "json"
-gem "octokit"
+gem "octopi"
 gem "rest-client"
 gem "ruby-debug"
