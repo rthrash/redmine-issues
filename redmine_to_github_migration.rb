@@ -78,7 +78,7 @@ else
       github_issue = create_issue(issue)
       add_labels(github_issue, issue)
       migrate_comments(github_issue, issue)
-      github_issue.close! if ["Closed", "Fixed", "Rejected", "Won't Fix", "Duplicate", "Obsolete", "Implemented"].include? issue["status"]["name"]
+      github_issue.close! if ["Closed", "Fixed", "Resolved", "Rejected", "Won't Fix", "Duplicate", "Obsolete", "Implemented"].include? issue["status"]["name"]
       print "."
       self.issue_pairs << [github_issue, issue]
       github_issue
@@ -112,7 +112,7 @@ else
     def create_issue redmine_issue
       title = redmine_issue["subject"]
       body = <<BODY
-Issue #<a href="{@redmine_url}/issues/{redmine_issue["id"]}">{redmine_issue["id"]}</a> from #{@redmine_url}/projects/#{@redmine_proj}
+Issue ID <a href="{@redmine_url}/issues/{redmine_issue["id"]}">{redmine_issue["id"]}</a> from #{@redmine_url}/projects/#{@redmine_proj}
 Created by: **#{redmine_issue["author"]["name"]}**
 On #{DateTime.parse(redmine_issue["created_on"]).asctime}
 
