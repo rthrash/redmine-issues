@@ -15,10 +15,8 @@ include Octokit
 
 config = YAML.load_file(@config_file)
 ghclient = Octokit::Client.new :access_token => config["github"]["token"]
-if not ghclient.user.login 
-  abort "Unable to authenticate with supplied credentials."
-else
-  puts "Github credentials passed!"
+abort "Unable to authenticate to GitHub with supplied credentials." unless ghclient.user.login
+puts "Github credentials passed!"
 
 
   class IssueMigrator
@@ -74,6 +72,7 @@ else
     end
 
     def migrate_issue issue
+      print "Migrating issues to github... "
       pad_issues(issue) if @pad_ids
       github_issue = create_issue(issue)
       add_labels(github_issue, issue)
@@ -81,6 +80,7 @@ else
       github_issue.close! if ["Closed", "Fixed", "Resolved", "Rejected", "Won't Fix", "Duplicate", "Obsolete", "Implemented"].include? issue["status"]["name"]
       print "."
       self.issue_pairs << [github_issue, issue]
+      puts "success!"
       github_issue
     end
 
@@ -129,12 +129,27 @@ On #{DateTime.parse(redmine_issue["created_on"]).asctime}
 #{redmine_issue["description"]}
 BODY
       begin
-        Octokit.create_issue(self.repo, title, body)
+        result_issue = Octokit.create_issue(self.repo, title, body)
+        result_issue.attrs
       rescue Exception => e
         redmine_issue["retrying?"] = true
         retry unless redmine_issue["retrying?"]
         puts "Issue open failed for Redmine Issue #{redmine_issue["id"]}"
       end
+    end
+    
+    def migrate_labels 
+      print "Migrating labels to github ... "
+      @labels = []
+      print "[work goes here] "
+      puts "success!"
+    end
+    
+    def migrate_milestones
+      print "Migrating milestones to github ... "
+      @milestones = []
+      print "[work goes here] "
+      puts "success!"
     end
 
     def add_labels github_issue, redmine_issue
@@ -223,7 +238,9 @@ COMMENT
   m = IssueMigrator.new(config)
   m.get_issues
 
-  puts "Migrating issues to github..."
+  m.migrate_labels
+  m.migrate_milestones
+  
   m.migrate_issues
   m.save_issues "migration.json"
   puts "Done migrating!"
