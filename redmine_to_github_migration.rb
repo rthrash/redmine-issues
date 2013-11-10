@@ -148,7 +148,16 @@ BODY
     def migrate_milestones
       print "Migrating milestones to github ... "
       @milestones = []
-      print "[work goes here] "
+      puts "Getting milestones for this project ..."
+      # get the versions as JSON out of redmine
+      json = RestClient.get("#{@redmine_url}/projects/#{@redmine_proj}/versions", {:params => {:format => :json}})
+      result = JSON.parse(json)
+      puts "Total versions: ".result['total_count']
+      # we want to work with the result['versions'] array …
+      
+      print "[do something with them here]"
+
+      puts
       puts "success!"
     end
 
