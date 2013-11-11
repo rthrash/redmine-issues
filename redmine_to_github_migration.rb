@@ -152,10 +152,11 @@ BODY
       # get the versions as JSON out of redmine
       json = RestClient.get("#{@redmine_url}/projects/#{@redmine_proj}/versions", {:params => {:format => :json}})
       result = JSON.parse(json)
-      puts "Total versions: ".result['total_count']
-      # we want to work with the result['versions'] array …
-      
-      print "[do something with them here]"
+      if !result["versions"].empty?  
+        puts "Total versions: ".result["total_count"]
+        # we want to work with the result['versions'] array …
+        print "[do something with them here]"
+      end 
 
       puts
       puts "success!"
