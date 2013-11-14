@@ -139,26 +139,67 @@ BODY
     end
     
     def migrate_labels 
-      print "Migrating labels to github ... "
-      @labels = []
-      print "[work goes here] "
+      puts "Migrating labels to github"
+      labels = []
+      labelhash = {}
+
+      # Collect all possible labels from our issues into a hash,
+      #  where the key is the label and the value is 1 to denote truth
+      self.redmine_issues.each do |issue|
+        ["priority", "tracker", "status"].each do |l|
+          labelhash[issue[l]["name"]] = 1 unless labelhash[issue[l]["name"]]
+        end
+        issue["custom_fields"].each do |l|
+          next unless l["name"] = "Resolution"
+          labelhash[l["value"]] = 1 unless labelhash[l["value"]]
+      end
+      
+      # Strip out blank labels, convert to lowercase, and strip out spaces
+      labelhash.reject!{|key, val| key == ""}
+      labels = labelhash.keys.map! {|l| l.downcase.delete(' ')}
+
+      # Check and see what labels are already in the github repo so we cut down on requests
+      # If it's already in the repo, don't recreate it
+      curlabels = Octokit.labels(self.repo)
+      curlabels.each {|c| labels.delete(c[:name])}
+      
+      # Add each possible label to the repo
+      print "Adding #{labels.length} labels to the repo ... "
+      labels.each do |label|
+        Octokit.add_label(self.repo, label)
+      end
+
       puts "success!"
     end
     
     def migrate_milestones
-      print "Migrating milestones to github ... "
-      @milestones = []
-      puts "Getting milestones for this project ..."
-      # get the versions as JSON out of redmine
-      json = RestClient.get("#{@redmine_url}/projects/#{@redmine_proj}/versions", {:params => {:format => :json}})
-      result = JSON.parse(json)
-      if !result["versions"].empty?  
-        puts "Total versions: ".result["total_count"]
-        # we want to work with the result['versions'] array …
-        print "[do something with them here]"
-      end 
-
-      puts
+      puts "Migrating milestones to github"
+      milestones = []
+      milestoneshash = {}
+      
+      # Collect all possible milestones from our issues into a hash,
+      #  where the key is the hash and the value is 1 to denote truth
+      self.redmine_issues.each do |issue|
+        if issue["fixed_version"]
+          milestoneshash[issue["fixed_version"]["name"]] = 1 unless milestoneshash[issue["fixed_version"]["name"]]
+        end
+      end
+      
+      # Strip out blank milestones
+      milestoneshash.reject!{|key, val| key == ""}
+      milestones = milestoneshash.keys
+      
+      # Check and see what milestones are already in the github repo so we cut down on requests
+      # If it's already in the repo, don't create it
+      curmilestones = Octokit.milestones(self.repo)
+      curmilestones.each {|c| milestones.delete(c.attrs[:title]) }
+      
+      # Add each possible milestone to the repo
+      print "Adding #{milestones.length} milestones to the repo ... "
+      milestones.each do |ms|
+        Octokit.create_milestone(self.repo, ms)
+      end
+      
       puts "success!"
     end
 
@@ -224,34 +265,33 @@ COMMENT
       end
     end
 
-    def save_issues filename
-      full_saveable = []
-      self.issue_pairs.each do |pair|
-        full_saveable << {
-          :redmine => pair[1].merge(:url => "#{@redmine_url}/issues/#{pair[1]["id"]}"),
-          :github => {
-            :url => "#{pair[0].repository.url}/issues/#{pair[0].number}",
-            :number => pair[0].number,
-            :repo_url => pair[0].repository.url
-          }
-        }
-      end
+    def save_issues_to_file filename
       File.open(filename, 'w') do |f|
-        f.write(full_saveable.to_json)
+        f.write(self.redmine_issues.to_json)
       end
+    end
+  
+    def get_issues_from_file filename
+      self.redmine_issues = JSON.parse(File.read(filename))
     end
   end
 
+  
   Octokit.configure do |c|
     c.access_token = config["github"]["token"]
   end
   m = IssueMigrator.new(config)
+  
+  # Use this to grab issues from redmine and save it out
+  # Or comment these two and use the third item to read in from file 
   m.get_issues
+  m.save_issues_to_file "migration.json"
+  #m.get_issues_from_file "migration.json"
 
+  # Skip these if you've already migrated the labels and milestones for your repo
   m.migrate_labels
   m.migrate_milestones
   
   m.migrate_issues
-  m.save_issues "migration.json"
   puts "Done migrating!"
 end
