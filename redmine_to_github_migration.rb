@@ -8,7 +8,7 @@ require 'yaml'
 require 'rest-client'
 require 'json'
 require 'octokit'
-require 'ruby-debug'
+#require 'ruby-debug'
 
 include Octokit
 @config_file = "github.yml"
@@ -89,7 +89,7 @@ puts "Github credentials passed!"
       while (last_issue + 1) < redmine_issue["id"].to_i
         last_issue = pad_issue
       end
-   end
+    end
 
     def pad_issue
       first_try = true
@@ -152,6 +152,7 @@ BODY
         issue["custom_fields"].each do |l|
           next unless l["name"] = "Resolution"
           labelhash[l["value"]] = 1 unless labelhash[l["value"]]
+        end
       end
       
       # Strip out blank labels, convert to lowercase, and strip out spaces
@@ -277,21 +278,21 @@ COMMENT
   end
 
   
-  Octokit.configure do |c|
-    c.access_token = config["github"]["token"]
-  end
-  m = IssueMigrator.new(config)
-  
-  # Use this to grab issues from redmine and save it out
-  # Or comment these two and use the third item to read in from file 
-  m.get_issues
-  m.save_issues_to_file "migration.json"
-  #m.get_issues_from_file "migration.json"
-
-  # Skip these if you've already migrated the labels and milestones for your repo
-  m.migrate_labels
-  m.migrate_milestones
-  
-  m.migrate_issues
-  puts "Done migrating!"
+Octokit.configure do |c|
+  c.access_token = config["github"]["token"]
 end
+m = IssueMigrator.new(config)
+
+# Use this to grab issues from redmine and save it out
+# Or comment these two and use the third item to read in from file 
+m.get_issues
+m.save_issues_to_file "migration.json"
+#m.get_issues_from_file "migration.json"
+
+# Skip these if you've already migrated the labels and milestones for your repo
+#m.migrate_labels
+#m.migrate_milestones
+
+#m.migrate_issues
+#puts "Done migrating!"
+
