@@ -112,7 +112,7 @@ puts "Github credentials passed!"
     def create_issue redmine_issue
       title = redmine_issue["subject"]
       body = <<BODY
-Issue ID <a href="{@redmine_url}/issues/{redmine_issue["id"]}">{redmine_issue["id"]}</a> from #{@redmine_url}/projects/#{@redmine_proj}
+Issue ID <a href="#{@redmine_url}/issues/#{redmine_issue["id"]}">#{redmine_issue["id"]}</a> from #{@redmine_url}/projects/#{@redmine_proj}
 Created by: **#{redmine_issue["author"]["name"]}**
 On #{DateTime.parse(redmine_issue["created_on"]).asctime}
 
@@ -226,6 +226,7 @@ BODY
       first_try = true
       begin
         github_issue.add_label URI.escape(label)
+        Octokit.add_labels_to_an_issue(self.repo, github_issue[:number], URI.escape(label))
         print ','
       rescue Exception => e
         puts
@@ -243,12 +244,14 @@ BODY
     def migrate_comments github_issue, redmine_issue
       redmine_issue["journals"].each do |j|
         next if j["notes"].nil? || j["notes"] == ''
-        github_issue.comment <<COMMENT
+        comment = <<COMMENT
+        
 Comment by: **#{j["user"]["name"]}**
 On #{DateTime.parse(j["created_on"]).asctime}
 
 #{j["notes"]}
 COMMENT
+      Octokit.add_comment(self.repo, github_issue[:number], comment)
       end
     end
 
@@ -285,13 +288,13 @@ m = IssueMigrator.new(config)
 
 # Use this to grab issues from redmine and save it out
 # Or comment these two and use the third item to read in from file 
-m.get_issues
-m.save_issues_to_file "migration.json"
-#m.get_issues_from_file "migration.json"
+#m.get_issues
+#m.save_issues_to_file "migration.json"
+m.get_issues_from_file "migration.json"
 
 # Skip these if you've already migrated the labels and milestones for your repo
-#m.migrate_labels
-#m.migrate_milestones
+m.migrate_labels
+m.migrate_milestones
 
 #m.migrate_issues
 #puts "Done migrating!"
