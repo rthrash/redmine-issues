@@ -1,0 +1,20 @@
+Hey Ryan,
+
+Thanks for getting in touch! ~30k request should be no problem for our API. The rate limit for authenticated requests is 5000 reqs/hour, so you would be done in a couple of hours:
+
+http://developer.github.com/v3/#rate-limiting
+
+However, our API isn't the best option for bulk importing large numbers of issues for several reasons. In addition to the thousands of notifications that would be sent to members of those repositories (one for each issue and comment), timestamps and other fields pose some problems. 
+
+If you can massage the data for the import, we might be able to help with this migration you're planning. We do some small imports of issues and milestones on our end manually. This manual import bypasses sending notifications and enables you to set the correct timestamps and users. 
+
+The input format we require for the import is described here:
+
+https://gist.github.com/izuzak/654612901803d0d0bc3f
+
+Once you have the data in the right format and files, reply here with links to the ZIP archives and repositories into which you want these issues imported. Since this is such a large import, I can't guarantee a turnaround time, but we normally handle these requests within a few days.
+
+Let us know if this sounds good or if you have any questions.
+
+Cheers,
+Ivan

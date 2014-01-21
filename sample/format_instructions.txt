@@ -1,0 +1,47 @@
+The Issue import format is a zip or tar.gz file, containing issue and milestone data. The data needs to be in JSON, matching the API v3 spec where possible. The directory layout looks like:
+
+-- issues
+    |-- 1.json
+    |-- 1.comments.json
+-- milestones
+    |-- 1.json
+
+Issues
+
+Each issue is in a numbered file like "NUMBER.json" in the "issues" directory. The numbers themselves are meaningless, but can serve as the issue number when created. The schema matches the API schema, with a few exceptions.
+
+Set number to customize the issue number. By default, use the number from the file name. This will not override an existing issue, however.
+labels should be an array of string names. You can use the array of label objects like the API, but only the name property will be used. Labels are created on demand if they don't already exist.
+Set user for the author of the issue. You can also set assignee if you like. See the "Users" section.
+Set created_at, updated_at, and closed_at as necessary. See the "Dates" section.
+
+Comments
+
+Comments are in a file like "NUMBER.comments.json" in the "issues" directory. The number should match the filename of the issue that these comments belong to. The file is a JSON array of issue comment API objects.
+
+Set user for the author of the issue. See the "Users" section.
+Set created_at, updated_at. See the "Dates" section.
+
+Milestones
+
+Milestones are in a file like "NUMBER.json" in the "milestones" directory. The number works like the imported issue number. The milestone should match the milestone API schema.
+
+Set number to customize the milestone number. By default, use the number from the file name. This will not override an existing milestone, however.
+Set creator to customize the GitHub user that created the milestone. See the "Users" section.
+Set created_at and due_on as necessary. See the "Dates" section.
+
+Users
+
+Users can be identified in GitHub by their email address or login. You can specify the user in one of these ways:
+
+"user": "bob"
+"user": "bob@example.com"
+"user": {"login": "bob"}
+"user": {"email": "bob@example.com"}
+If there is no matching user, a fallback user will be used instead. By default, the fallback user will be the user on who's behalf we are doing the import. We can change this if needed, but this fallback user must be an owner of the repository into which the issues are being imported.
+
+Dates
+
+Dates should be in the ISO 8601 format that the API prefers. UTC is preferred.
+
+"2011-04-10T20:09:31Z"
